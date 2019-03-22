@@ -1,0 +1,5 @@
+<launch>
+  <node name="draw_retangle" pkg="my_plan" type="draw_retangle" output="screen">
+    <remap from="/joint_states" to="/j2n6s300_driver/out/joint_state" />
+  </node>
+</launch>
