@@ -5,7 +5,7 @@
 #include <actionlib/client/simple_action_client.h>
 #include <move_base_msgs/MoveBaseAction.h>
 
-#define INIT_ROT_ANG_V 0.5      //the velocity of initial rotation
+#define ROT_ANG_V 0.5      //the velocity of initial rotation
 #define PI 3.14159
 
 
@@ -22,6 +22,8 @@ private:
     mobile_goal target_pose_;
     mobile_goal current_pose_;
 public:
+    void getCurrentPose();
+    bool carRotation(int angle,ros::NodeHandle &node_handle);
     bool initRotation(ros::NodeHandle &node_handle);
     void activeCb();
     void feedbackCb(const move_base_msgs::MoveBaseFeedbackConstPtr& move_base_feedback);
