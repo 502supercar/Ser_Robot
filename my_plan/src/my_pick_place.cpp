@@ -7,6 +7,7 @@
 #include <cmath>
 
 const double FINGER_MAX=6400;
+int mode;
 
 using namespace kinova;
 
@@ -372,6 +373,8 @@ bool PickPlace::workspace(double x,double y,double z)
     else
     {
         ROS_INFO("The target is not in the workspace.");
+        ROS_INFO("Start to transform the replan mode");
+        mode=3;
         return false;
     }
 }
@@ -429,6 +432,7 @@ void PickPlace::evaluate_plan(moveit::planning_interface::MoveGroupInterface &gr
 {
     bool replan=true;
     int count=0;
+    position_replan_=false;
 
     moveit::planning_interface::MoveGroupInterface::Plan my_plan;
 
@@ -447,6 +451,18 @@ void PickPlace::evaluate_plan(moveit::planning_interface::MoveGroupInterface &gr
             result_=(group.plan(my_plan)==moveit::planning_interface::MoveItErrorCode::SUCCESS);
             ROS_INFO("At attemp: %d",count);
             ros::WallDuration(0.1).sleep();
+            if(result_==false)
+            {
+                std::cout<<"Please input q to adjust car's angle,others to skip:";
+                std::cin>>pause_;
+                ros::WallDuration(0.5).sleep();
+                if(pause_=="q" || pause_=="Q")
+                {
+                    mode=3;
+                    position_replan_=true;
+                    return;
+                }
+            } 
         }
 
         if(result_==true)
@@ -497,6 +513,7 @@ bool PickPlace::define_pick(double x,double y,double z)
     arm_group_->clearPathConstraints();
     arm_group_->setNamedTarget("Home");
     evaluate_plan(*arm_group_);
+    if(position_replan_) return false;
 
     ros::WallDuration(1.0).sleep();
     gripper_group_->setNamedTarget("Open");
@@ -514,10 +531,12 @@ bool PickPlace::define_pick(double x,double y,double z)
     ROS_INFO_STREAM("Planning to pre-grasp position");
     arm_group_->setPoseTarget(pregrasp_pose_);
     evaluate_plan(*arm_group_);
+    if(position_replan_) return false;
 
     ROS_INFO_STREAM("Approaching to grasp position");
     arm_group_->setPoseTarget(grasp_pose_);
     evaluate_plan(*arm_group_);
+    if(position_replan_) return false;
 
     ROS_INFO_STREAM("Grasping...");
     add_attached_obstacle();
@@ -525,7 +544,8 @@ bool PickPlace::define_pick(double x,double y,double z)
 
     ROS_INFO_STREAM("Planning to post-grasp position");
     arm_group_->setPoseTarget(postgrasp_pose_);
-    evaluate_plan(*arm_group_); 
+    evaluate_plan(*arm_group_);
+    if(position_replan_) return false; 
 
     /*
     ROS_INFO_STREAM("Releasing gripper...");
@@ -545,10 +565,12 @@ bool PickPlace::define_place()
     std::cin>>pause_;
     arm_group_->setPoseTarget(preplace_pose_);
     evaluate_plan(*arm_group_);
+    if(position_replan_) return false;
 
     ROS_INFO_STREAM("Approaching to place position");
     arm_group_->setPoseTarget(place_pose_);
     evaluate_plan(*arm_group_);
+    if(position_replan_) return false;
 
     ROS_INFO_STREAM("Releasing gripper...");
     gripper_three_action(0.0);
@@ -557,6 +579,7 @@ bool PickPlace::define_place()
     ROS_INFO_STREAM("Planning to post_place position");
     arm_group_->setPoseTarget(postplace_pose_);
     evaluate_plan(*arm_group_);
+    if(position_replan_) return false;
 
     /*ROS_INFO_STREAM("Planning to start position");
     arm_group_->setPoseTarget(start_pose_);
@@ -567,6 +590,7 @@ bool PickPlace::define_place()
     arm_group_->clearPathConstraints();
     arm_group_->setNamedTarget("Home");
     evaluate_plan(*arm_group_);
+    if(position_replan_) return false;
 
     ROS_INFO_STREAM("Press any key to quit...");
     std::cin>>pause_;
@@ -575,38 +599,20 @@ bool PickPlace::define_place()
 }
 
 
-void PickPlace::pick(double x,double y,double z)
+bool PickPlace::pick(double x,double y,double z)
 {
     define_grasp_cartesian_pose(x,y,z);
 
     result_=false;
-    define_pick(x,y,z);
+    if(define_pick(x,y,z)) return true;
+    else return false;
 }
 
-void PickPlace::place(double x,double y,double z)
+bool PickPlace::place(double x,double y,double z)
 {
     define_place_cartesian_pose(x,y,z);
 
     result_=false;
-    define_place();
+    if(define_place()) return true;
+    else return false;
 }
-
-/*
-int main(int argc,char** argv)
-{ 
-    ros::init(argc, argv, "my_pick_place");
-    ros::NodeHandle node;
-    ros::AsyncSpinner spinner(1);
-    spinner.start();
-
-    Mobile_Base mobilebase;     //创建一个Mobile_Base对象
-
-    mobilebase.initRotation(node);        //初始化旋转定位
-
-    mobilebase.moveToGoal(0.5, 0.0, 0.0, node);      //发送目标点
-
-    kinova::PickPlace pick_place(node);
-
-    ros::spin();
-    return 0;
-}*/
