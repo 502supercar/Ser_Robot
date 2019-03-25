@@ -39,8 +39,8 @@ namespace kinova
         public:
             PickPlace(ros::NodeHandle &nh);
             ~PickPlace();
-            void pick(double x,double y,double z);
-            void place(double x,double y,double z);
+            bool pick(double x,double y,double z);
+            bool place(double x,double y,double z);
             bool workspace(double x,double y,double z);
         private:
             ros::NodeHandle nh_;
@@ -73,6 +73,7 @@ namespace kinova
             std::vector<double> joint_value_;
 
             bool result_;
+            bool position_replan_;
 
             std::string pause_;
             std::string robot_type_;
