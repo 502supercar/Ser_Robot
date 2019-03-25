@@ -18,7 +18,7 @@ Mobile_Base::Mobile_Base(ros::NodeHandle &nh):nh_(nh),ac_("move_base", true)
     current_pose_.theta = 0;
 
     car_tw_pub_ = nh_.advertise<geometry_msgs::Twist>("/ir100_velocity_controller/cmd_vel",1000);
-
+    car_pose_sub_ = nh_.subscribe("/amcl_pose", 1000, &Mobile_Base::amclCbSetPose, this);
 }
 
 //disconsructer
@@ -27,6 +27,18 @@ Mobile_Base::~Mobile_Base()
 
 }
 
+//Get current pose by subscribing the amcl topic
+void Mobile_Base::amclCbSetPose(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg)
+{
+    current_pose_.x = msg->pose.pose.position.x;
+    current_pose_.y = msg->pose.pose.position.y;
+
+    double z = msg->pose.pose.orientation.z;
+    current_pose_.theta = 2*asin(z);
+    ROS_INFO("You are here: [x= %f,y= %f, theta= %f]",current_pose_.x,current_pose_.y,current_pose_.theta);
+}
+
+//Get current pose by TF
 void Mobile_Base::getCurrentPose()
 {
     //定义tf监听器
@@ -58,6 +70,7 @@ void Mobile_Base::getCurrentPose()
     //ROS_INFO("Current: x= %f, y= %f,theta= %f",current_pose_.x,current_pose_.y,current_pose_.theta);
 }
 
+//function of car rotation
 bool Mobile_Base::carRotation(int angle)
 {
     //设置循环的频率
@@ -68,51 +81,55 @@ bool Mobile_Base::carRotation(int angle)
     //设置原地旋转的速度
     tw.linear.x = 0.0;
     tw.linear.y = 0.0;
-    if(angle > 0) tw.angular.z = ROT_ANG_V;
-	else if(angle < 0) tw.angular.z = -ROT_ANG_V;
+    if(angle > 0) tw.angular.z = ROT_ANG_V;         //正的逆时针旋转
+	else if(angle < 0) tw.angular.z = -ROT_ANG_V;   //负的顺时针旋转
     else return 0;
 
-    getCurrentPose();
+    getCurrentPose();       //获取当前小车的位姿
+    //计算小车所需旋转的180度次数，以及剩下的度数
     int abs_angle = abs(angle);
-    double start_offset = 0 - current_pose_.theta;
+    double start_offset = 0 - current_pose_.theta;      //设置相对零点
     int round = abs_angle/180;
     int remain_angle = abs_angle%180;
     double angle_rad = remain_angle/180.0 * PI;
 
-    //执行完整圈数的旋转
+    //执行180度的旋转
     double temp;
     int n = 0;
     double distance = 0;
     while(round != 0)
     {
-        getCurrentPose();
+        //计算小车旋转180度后的位置
         if(((current_pose_.theta >0) && (angle >0)) || ((current_pose_.theta) >0 && (angle <0))) 
             temp = current_pose_.theta - PI;
         else temp = current_pose_.theta + PI;
+
         while(1)
         {
-            getCurrentPose();
-            distance = fabs(current_pose_.theta - temp);
-            if(distance < 0.2) break;
-            ROS_INFO("current_pose_.theta= %f,temp= %f,distance= %f",current_pose_.theta,temp,distance);
+            distance = fabs(current_pose_.theta - temp);    //计算与目标相差的距离
+            if(distance < ROT_TOLERANT) break;
+            //ROS_INFO("current_pose_.theta= %f,temp= %f,distance= %f",current_pose_.theta,temp,distance);
             car_tw_pub_.publish(tw);
+            ros::spinOnce();    //等待回调函数，获取小车的位置
         }
        --round;
+       ros::spinOnce();         //等待回调函数，获取小车的位置
     }
 
     //执行剩下角度的旋转
     double cur_angle = 0;
     distance=0;
-    getCurrentPose();
+    ros::spinOnce();            //等待回调函数，获取小车的位置
+
     start_offset = 0 - current_pose_.theta;
     while(remain_angle != 0)
     {
-        getCurrentPose();
         cur_angle = current_pose_.theta + start_offset;
         distance = fabs(angle_rad-fabs(cur_angle));
-        ROS_INFO("cur_angle= %f,angle_rad= %f,distance= %f",cur_angle,angle_rad,distance);
-        if(distance < 0.2) break;
+        //ROS_INFO("cur_angle= %f,angle_rad= %f,distance= %f",cur_angle,angle_rad,distance);
+        if(distance < ROT_TOLERANT) break;
         car_tw_pub_.publish(tw);
+        ros::spinOnce();
     }
 
     tw.angular.z = 0.0;
@@ -156,29 +173,10 @@ void Mobile_Base::feedbackCb(const move_base_msgs::MoveBaseFeedbackConstPtr& mov
     //ROS_INFO("You are here: [x= %f,y= %f, theta= %f]",current_pose_.x,current_pose_.y,current_pose_.theta);
 }
 
-
+//Set the target of car by position of object
 void Mobile_Base::getGoalFromObject(double x, double y, double z)
 {
-    //定义tf监听器
-    tf::TransformListener listener;
-
-    //定义存贮转换矩阵的变量
-    tf::StampedTransform transform;
-
-    try
-    {
-        //查找base与map的坐标转换
-        listener.waitForTransform("/map", "/base_link", ros::Time(0), ros::Duration(3.0));
-        listener.lookupTransform("/map", "/base_link", ros::Time(0), transform);
-    }
-    catch (tf::TransformException &ex)
-    {
-        ROS_ERROR("%s", ex.what());
-        ros::Duration(1.0).sleep();
-    }
-
-    current_pose_.x = transform.getOrigin().x();
-    current_pose_.y = transform.getOrigin().y();
+    getCurrentPose();
     
     double angle = atan2((y - current_pose_.y),(x - current_pose_.x));
     if(y > current_pose_.y) target_pose_.y =y-0.8*sin(angle);
@@ -192,6 +190,7 @@ void Mobile_Base::getGoalFromObject(double x, double y, double z)
     ROS_INFO("Target:  x = %f, y = %f",target_pose_.x,target_pose_.y);
 }
 
+//Start moving to the target
 bool Mobile_Base::moveToGoal()
 {
     if(ros::ok())
