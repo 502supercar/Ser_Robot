@@ -1,0 +1,15 @@
+<launch>
+	<arg name="gui" default="True" />
+	<!--param name="robot_description" command="$(find xacro)/xacro inorder '$(find ser_robot_description)/urdf/xacro/ser_robot.xacro'" /-->
+  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find kinova_description)/urdf/ser_robot.xacro'" />
+	<param name="use_gui" value="$(arg gui)"/>
+	<node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
+		<param name="zeros/j2n6s300_joint_2" value="3.1415"/>
+		<param name="zeros/j2n6s300_joint_3" value="3.1415"/>
+	  <param name="zeros/j2n6s300_joint_4" value="3.1415"/> 
+	</node>
+
+	<node name="robot_state_publisher" pkg="robot_state_publisher" type="state_publisher" />
+	<node name="rviz" pkg="rviz" type="rviz" args="-d $(find ser_robot_description)/config/display_my_robot.rviz" required="true" />
+
+</launch>
