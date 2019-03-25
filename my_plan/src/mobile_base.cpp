@@ -2,7 +2,7 @@
 #include <geometry_msgs/Twist.h>
 #include <move_base_msgs/MoveBaseAction.h>
 #include <actionlib/client/simple_action_client.h>
-#include <ser_robot/mobile_base.h>
+#include <mobile_base.h>
 #include <cmath>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
