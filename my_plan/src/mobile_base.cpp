@@ -6,7 +6,26 @@
 #include <cmath>
 #include <tf/transform_listener.h>
 
-typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> MoveBaseClient;
+
+//constructer
+Mobile_Base::Mobile_Base(ros::NodeHandle &nh):nh_(nh),ac_("move_base", true)
+{
+    target_pose_.x = 0;
+    target_pose_.y = 0;
+    target_pose_.theta = 0;
+    current_pose_.x = 0;
+    current_pose_.y = 0;
+    current_pose_.theta = 0;
+
+    car_tw_pub_ = nh_.advertise<geometry_msgs::Twist>("/ir100_velocity_controller/cmd_vel",1000);
+
+}
+
+//disconsructer
+Mobile_Base::~Mobile_Base()
+{
+
+}
 
 void Mobile_Base::getCurrentPose()
 {
@@ -39,11 +58,8 @@ void Mobile_Base::getCurrentPose()
     //ROS_INFO("Current: x= %f, y= %f,theta= %f",current_pose_.x,current_pose_.y,current_pose_.theta);
 }
 
-bool Mobile_Base::carRotation(int angle,ros::NodeHandle &node_handle)
+bool Mobile_Base::carRotation(int angle)
 {
-    //创建一个发布者，消息类型为geometry::Twist
-	ros::Publisher rotation_pub =node_handle.advertise<geometry_msgs::Twist>("/ir100_velocity_controller/cmd_vel",1000);
-
     //设置循环的频率
 	ros::Rate loop_rate(10);
 
@@ -78,8 +94,8 @@ bool Mobile_Base::carRotation(int angle,ros::NodeHandle &node_handle)
             getCurrentPose();
             distance = fabs(current_pose_.theta - temp);
             if(distance < 0.2) break;
-            //ROS_INFO("current_pose_.theta= %f,temp= %f,distance= %f",current_pose_.theta,temp,distance);
-            rotation_pub.publish(tw);
+            ROS_INFO("current_pose_.theta= %f,temp= %f,distance= %f",current_pose_.theta,temp,distance);
+            car_tw_pub_.publish(tw);
         }
        --round;
     }
@@ -94,46 +110,24 @@ bool Mobile_Base::carRotation(int angle,ros::NodeHandle &node_handle)
         getCurrentPose();
         cur_angle = current_pose_.theta + start_offset;
         distance = fabs(angle_rad-fabs(cur_angle));
-        //ROS_INFO("cur_angle= %f,angle_rad= %f,distance= %f",cur_angle,angle_rad,distance);
+        ROS_INFO("cur_angle= %f,angle_rad= %f,distance= %f",cur_angle,angle_rad,distance);
         if(distance < 0.2) break;
-        rotation_pub.publish(tw);
+        car_tw_pub_.publish(tw);
     }
 
     tw.angular.z = 0.0;
-    rotation_pub.publish(tw);
+    car_tw_pub_.publish(tw);
     ros::spinOnce();
     loop_rate.sleep();
     return 1;
 }
 
-bool Mobile_Base::initRotation(ros::NodeHandle &node_handle)  //mobile_base initial rotation
+bool Mobile_Base::initRotation()  //mobile_base initial rotation
 {
     if(ros::ok())
     {
-        //创建一个发布者，消息类型为geometry::Twist
-	    ros::Publisher rotation_pub =node_handle.advertise<geometry_msgs::Twist>("/ir100_velocity_controller/cmd_vel",1000);
-
-        //设置循环的频率
-	    ros::Rate loop_rate(10);
-
-        //初始化发送的消息变量
-        geometry_msgs::Twist tw;
-
-        //设置原点旋转的速度
-        tw.linear.x=0;
-	    tw.angular.z=INIT_ROT_ANG_V;
-
-        float rot_duration=(4*PI)/INIT_ROT_ANG_V;   //3圈对应的弧度除以0.5rad/s
-        int ticks=int(rot_duration*10);  //1一秒10次，算出计时次数
-
         ROS_INFO("Initial rotation started!!");
-        for(int i = 0; i < ticks; i++)
-        {
-     	    //发布消息
-		    rotation_pub.publish(tw);
-            ros::spinOnce();
-            loop_rate.sleep();
-        }
+        carRotation(720);
 	    ROS_INFO("Rotation completed!!");
         return true;
     }
@@ -162,53 +156,6 @@ void Mobile_Base::feedbackCb(const move_base_msgs::MoveBaseFeedbackConstPtr& mov
     //ROS_INFO("You are here: [x= %f,y= %f, theta= %f]",current_pose_.x,current_pose_.y,current_pose_.theta);
 }
 
-bool Mobile_Base::moveToGoal(ros::NodeHandle &node_handle)
-{
-    if(ros::ok())
-    {
-        //creat a move_base client
-        MoveBaseClient ac("move_base", true);
-
-        //wait for the action server to come up
-        while(!ac.waitForServer(ros::Duration(5.0)))
-        {
-            ROS_INFO("Waiting for the move_base action server to come up");
-        }
-        move_base_msgs::MoveBaseGoal goal;
-
-        goal.target_pose.header.frame_id = "base_link";
-        goal.target_pose.header.stamp = ros::Time::now();
-
-        //RPY to Quaternion of the mobile_base
-        goal.target_pose.pose.position.x = target_pose_.x;
-        goal.target_pose.pose.position.y = target_pose_.y;
-        goal.target_pose.pose.orientation.z = sin(target_pose_.theta/2);
-        goal.target_pose.pose.orientation.w = cos(target_pose_.theta/2);
-
-        ROS_INFO("Sending goal");
-        ac.sendGoal(goal, MoveBaseClient::SimpleDoneCallback(),
-                        boost::bind(&Mobile_Base::activeCb, this),
-                        boost::bind(&Mobile_Base::feedbackCb, this, _1));
-
-        ac.waitForResult();
-
-        if(ac.getState() == actionlib::SimpleClientGoalState::SUCCEEDED)
-        {
-            ROS_INFO("Mobile base has reached the target pose!");
-            return true;
-        }
-        else
-        {
-            ROS_INFO("The mobile base failed to reach the target pose for some reason.");
-            return false;
-        }
-    }
-    else
-    {
-        ROS_INFO("There is something wrong!");
-        return false;
-    }
-}
 
 void Mobile_Base::getGoalFromObject(double x, double y, double z)
 {
@@ -243,4 +190,50 @@ void Mobile_Base::getGoalFromObject(double x, double y, double z)
     target_pose_.theta = 0;
 
     ROS_INFO("Target:  x = %f, y = %f",target_pose_.x,target_pose_.y);
+}
+
+bool Mobile_Base::moveToGoal()
+{
+    if(ros::ok())
+    {
+
+        //wait for the action server to come up
+        while(!ac_.waitForServer(ros::Duration(5.0)))
+        {
+            ROS_INFO("Waiting for the move_base action server to come up");
+        }
+        move_base_msgs::MoveBaseGoal goal;
+
+        goal.target_pose.header.frame_id = "base_link";
+        goal.target_pose.header.stamp = ros::Time::now();
+
+        //RPY to Quaternion of the mobile_base
+        goal.target_pose.pose.position.x = target_pose_.x;
+        goal.target_pose.pose.position.y = target_pose_.y;
+        goal.target_pose.pose.orientation.z = sin(target_pose_.theta/2);
+        goal.target_pose.pose.orientation.w = cos(target_pose_.theta/2);
+
+        ROS_INFO("Sending goal");
+        ac_.sendGoal(goal, MoveBaseClient::SimpleDoneCallback(),
+                        boost::bind(&Mobile_Base::activeCb, this),
+                        boost::bind(&Mobile_Base::feedbackCb, this, _1));
+
+        ac_.waitForResult();
+
+        if(ac_.getState() == actionlib::SimpleClientGoalState::SUCCEEDED)
+        {
+            ROS_INFO("Mobile base has reached the target pose!");
+            return true;
+        }
+        else
+        {
+            ROS_INFO("The mobile base failed to reach the target pose for some reason.");
+            return false;
+        }
+    }
+    else
+    {
+        ROS_INFO("There is something wrong!");
+        return false;
+    }
 }
