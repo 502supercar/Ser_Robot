@@ -6,9 +6,11 @@
 #include <move_base_msgs/MoveBaseAction.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 
-#define ROT_ANG_V 0.8      //the velocity of initial rotation
+#define ROT_MAX_V 0.6      //the velocity of initial rotation
+#define ROT_MIN_V 0.2
 #define ROT_TOLERANT 0.2
 #define PI 3.14159
+#define ROT_ACC_LIMIT 0.5v
 
 typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> MoveBaseClient;
 
