@@ -81,8 +81,10 @@ bool Mobile_Base::carRotation(int angle)
     //设置原地旋转的速度
     tw.linear.x = 0.0;
     tw.linear.y = 0.0;
-    if(angle > 0) tw.angular.z = ROT_ANG_V;         //正的逆时针旋转
-	else if(angle < 0) tw.angular.z = -ROT_ANG_V;   //负的顺时针旋转
+    
+    char rot_signal;
+    if(angle > 0) rot_signal = 1;         //正的逆时针旋转
+	else if(angle < 0) rot_signal = -1;   //负的顺时针旋转
     else return 0;
 
     getCurrentPose();       //获取当前小车的位姿
@@ -97,6 +99,7 @@ bool Mobile_Base::carRotation(int angle)
     double temp;
     int n = 0;
     double distance = 0;
+    double vel = 0;
     while(round != 0)
     {
         //计算小车旋转180度后的位置
@@ -109,6 +112,13 @@ bool Mobile_Base::carRotation(int angle)
             distance = fabs(current_pose_.theta - temp);    //计算与目标相差的距离
             if(distance < ROT_TOLERANT) break;
             //ROS_INFO("current_pose_.theta= %f,temp= %f,distance= %f",current_pose_.theta,temp,distance);
+            if(remain_angle == 0 && round == 1)
+            {
+                vel = sqrt(2*ROT_ACC_LIMIT*distance);
+            }
+            else vel = ROT_MAX_V;
+            vel = std::min(std::max(vel,ROT_MIN_V),ROT_MAX_V);
+            tw.angular.z = rot_signal*vel;
             car_tw_pub_.publish(tw);
             ros::spinOnce();    //等待回调函数，获取小车的位置
         }
@@ -128,6 +138,9 @@ bool Mobile_Base::carRotation(int angle)
         distance = fabs(angle_rad-fabs(cur_angle));
         //ROS_INFO("cur_angle= %f,angle_rad= %f,distance= %f",cur_angle,angle_rad,distance);
         if(distance < ROT_TOLERANT) break;
+        vel = sqrt(2*ROT_ACC_LIMIT*distance);
+        vel = std::min(std::max(vel,ROT_MIN_V),ROT_MAX_V);
+        tw.angular.z = rot_signal*vel;
         car_tw_pub_.publish(tw);
         ros::spinOnce();
     }
