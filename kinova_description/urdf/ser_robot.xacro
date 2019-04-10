@@ -1,21 +1,7 @@
 <?xml version="1.0"?>
 <robot name="ser_robot" xmlns:xacro="http://www.ros.org/wiki/xacro">
-<!--robot xmlns:xi="http://www.w3.org/2001/XInclude"
-	xmlns:gazebo="http://playerstage.sourceforge.net/gazebo/xmlschema/#gz"
-    xmlns:model="http://playerstage.sourceforge.net/gazebo/xmlschema/#model"
-	xmlns:sensor="http://playerstage.sourceforge.net/gazebo/xmlschema/#sensor"
-	xmlns:body="http://playerstage.sourceforge.net/gazebo/xmlschema/#body"
-    xmlns:geom="http://playerstage.sourceforge.net/gazebo/xmlschema/#geom"
-    xmlns:joint="http://playerstage.sourceforge.net/gazebo/xmlschema/#joint"
-	xmlns:controller="http://playerstage.sourceforge.net/gazebo/xmlschema/#controller"
-	xmlns:interface="http://playerstage.sourceforge.net/gazebo/xmlschema/#interface"
-	xmlns:rendering="http://playerstage.sourceforge.net/gazebo/xmlschema/#rendering"
-    xmlns:renderable="http://playerstage.sourceforge.net/gazebo/xmlschema/#renderable"
-    xmlns:physics="http://playerstage.sourceforge.net/gazebo/xmlschema/#physics"
-	xmlns:xacro="http://ros.org/wiki/xacro" name="ser_robot"-->
 
 	<xacro:include filename="$(find kinova_description)/urdf/ser_robot_base.xacro" />
-  <!--xacro:include filename="$(find kinova_description)/urdf/j2n6s300_standalone.xacro"/-->
 	<xacro:include filename="$(find kinova_description)/urdf/j2n6s300.xacro"/>
 
 	<!-- base -->
@@ -37,8 +23,6 @@
     	</collision>     
   	</link>
   
-    <!--link name="base_link"/-->
-
   	<joint name="connect_root_and_base" type="fixed">
     	<child link="root" />
     	<parent link="base_link" />

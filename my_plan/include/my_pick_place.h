@@ -27,10 +27,11 @@
 #include <moveit_msgs/DisplayRobotState.h>
 #include <moveit_msgs/ApplyPlanningScene.h>
 #include <moveit_msgs/DisplayTrajectory.h>
+#include <tf/transform_listener.h>
 
-const int x_workspace=0.85;
-const int y_workspace=0.85;
-const int z_workspace=1.1;
+const double x_workspace=0.95;
+const double y_workspace=0.95;
+const double z_workspace=1.1;
 
 namespace kinova
 {
@@ -39,9 +40,12 @@ namespace kinova
         public:
             PickPlace(ros::NodeHandle &nh);
             ~PickPlace();
+            void home();
             bool pick(double x,double y,double z);
             bool place(double x,double y,double z);
             bool workspace(double x,double y,double z);
+            bool tf_listen();
+            bool random_position(double x,double y,double z);
         private:
             ros::NodeHandle nh_;
 
@@ -84,6 +88,11 @@ namespace kinova
             sensor_msgs::JointState current_state_;
             geometry_msgs::PoseStamped current_pose_;
 
+            tf::TransformListener listener;
+            double tf_x[20];
+            double tf_y[20];
+            double tf_z[20];
+
           /*  std::vector<double> start_joint_;
             std::vector<double> grasp_joint_;
             std::vector<double> pregrasp_joint_;
@@ -96,6 +105,7 @@ namespace kinova
             geometry_msgs::PoseStamped place_pose_;
             geometry_msgs::PoseStamped preplace_pose_;
             geometry_msgs::PoseStamped postplace_pose_;
+            geometry_msgs::PoseStamped replan_pose_;
 
             void add_obstacle();
             void clear_obstacle();

@@ -40,6 +40,9 @@ find_package(Eigen REQUIRED)
 
 find_package(kinova_driver REQUIRED)
 
+set(Opencv_DIR /opt/ros/kinetic/share/OpenCV-3.3.1-dev)
+find_package(OpenCV REQUIRED)
+
 ###########
 ## Build ##
 ###########
@@ -51,8 +54,22 @@ include_directories(
 include_directories(SYSTEM ${Boost_INCLUDE_DIR} ${EIGEN_INCLUDE_DIRS})
 include_directories(${catkin_INCLUDE_DIRS})
 link_directories(${catkin_LIBRARY_DIRS})
+link_directories(/usr/local/zed/lib)
 
 include_directories(${kinova_driver_INCLUDE_DIRS})
+
+add_executable(jiance2 src/jiance2.cpp)
+#add_dependencies(jiance2 ${catkin_LIBRARIES} ${PROJECT_NAME}_EXPORTED_TARGETS)
+target_link_libraries(jiance2
+ libsl_core.so
+ libsl_input.so
+ libsl_svo.so
+ libsl_zed.so
+ ${catkin_LIBRARIES}
+ ${OpenCV_LIBS})
+
+add_executable(tf_listen_example src/tf_listen_example.cpp)
+target_link_libraries(tf_listen_example ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 
 add_executable(draw_retangle src/draw_retangle.cpp)
 target_link_libraries(draw_retangle ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${kinova_driver_LIBRARIES})

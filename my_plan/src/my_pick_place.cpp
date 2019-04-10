@@ -8,6 +8,7 @@
 
 const double FINGER_MAX=6400;
 int mode;
+double position[3];
 
 using namespace kinova;
 
@@ -232,9 +233,9 @@ void PickPlace::build_workscene()
 
 void PickPlace::clear_workscene()
 {
-    co_.id="table";
+    /*co_.id="table";
     co_.operation=moveit_msgs::CollisionObject::REMOVE;
-    pub_co_.publish(co_);
+    pub_co_.publish(co_);*/
 
     co_.id="target_cylinder";
     co_.operation=moveit_msgs::CollisionObject::REMOVE;
@@ -298,10 +299,10 @@ void PickPlace::define_grasp_cartesian_pose(double x,double y,double z)
     grasp_pose_.pose.orientation.z=q.z();
     grasp_pose_.pose.orientation.w=q.w();
 
-    grasp_pose_=generate_gripper_align_pose(grasp_pose_,0.04,M_PI/4,M_PI/2,M_PI/2);
-    pregrasp_pose_=generate_gripper_align_pose(grasp_pose_,0.1,M_PI/4,M_PI/2,M_PI/2);
+    grasp_pose_=generate_gripper_align_pose(grasp_pose_,0.032,M_PI/4,M_PI/2,M_PI/2);
+    pregrasp_pose_=generate_gripper_align_pose(grasp_pose_,0.15,M_PI/4,M_PI/2,M_PI/2);
     postgrasp_pose_=grasp_pose_;
-    postgrasp_pose_.pose.position.z+=0.05;
+    postgrasp_pose_.pose.position.z+=0.1;
 }
 
 void PickPlace::define_place_cartesian_pose(double x,double y,double z)
@@ -365,7 +366,16 @@ geometry_msgs::PoseStamped PickPlace::generate_gripper_align_pose(geometry_msgs:
 
 bool PickPlace::workspace(double x,double y,double z)
 {
-    if((abs(x+0.0955)<=x_workspace)&&(abs(y)<=y_workspace)&&((z+0.433)<=z_workspace)&&(z>0))
+   /* ROS_INFO("x is %f",x);
+    ROS_INFO("y is %f",y);
+    ROS_INFO("z is %f",z);
+   int x_flag=((fabs(x-0.0955)<=x_workspace);
+    int y_flag=((fabs(y))<=y_workspace);
+    int z_flag=((z-0.433)<=z_workspace);
+    ROS_INFO("1 :%d",x_flag);
+    ROS_INFO("2 :%d",y_flag);
+    ROS_INFO("3 :%d",z_flag);*/
+    if((fabs(x-0.0955)<=x_workspace)&&(fabs(y)<=y_workspace)&&((z-0.433)<=z_workspace)&&(z>0))
     {
         ROS_INFO("The target is in the workspace.");
         return true;
@@ -373,8 +383,8 @@ bool PickPlace::workspace(double x,double y,double z)
     else
     {
         ROS_INFO("The target is not in the workspace.");
-        ROS_INFO("Start to transform the replan mode");
-        mode=3;
+        ROS_INFO("Start to the mode 4.");
+        mode=4;
         return false;
     }
 }
@@ -458,7 +468,7 @@ void PickPlace::evaluate_plan(moveit::planning_interface::MoveGroupInterface &gr
                 ros::WallDuration(0.5).sleep();
                 if(pause_=="q" || pause_=="Q")
                 {
-                    mode=3;
+                    //mode=5;
                     position_replan_=true;
                     return;
                 }
@@ -501,14 +511,32 @@ void PickPlace::evaluate_plan(moveit::planning_interface::MoveGroupInterface &gr
     ros::WallDuration(1.0).sleep();
 }
 
+void PickPlace::home()
+{
+    clear_workscene();
+    ros::WallDuration(1.0).sleep();
+   /* build_workscene();
+    ros::WallDuration(1.0).sleep();*/
+
+    ROS_INFO("Please press any key to send robot to the Home");
+    std::cin>>pause_;
+    arm_group_->clearPathConstraints();
+    arm_group_->setNamedTarget("Home");
+    evaluate_plan(*arm_group_);
+
+    ros::WallDuration(1.0).sleep();
+    gripper_group_->setNamedTarget("Open");
+    gripper_group_->move();
+}
+
 bool PickPlace::define_pick(double x,double y,double z)
 {
     clear_workscene();
     ros::WallDuration(1.0).sleep();
-    build_workscene();
-    ros::WallDuration(1.0).sleep();
+   /* build_workscene();
+    ros::WallDuration(1.0).sleep();*/
 
-    ROS_INFO("Please press any key to send robot to the Home");
+   /* ROS_INFO("Please press any key to send robot to the Home");
     std::cin>>pause_;
     arm_group_->clearPathConstraints();
     arm_group_->setNamedTarget("Home");
@@ -517,9 +545,9 @@ bool PickPlace::define_pick(double x,double y,double z)
 
     ros::WallDuration(1.0).sleep();
     gripper_group_->setNamedTarget("Open");
-    gripper_group_->move();
+    gripper_group_->move();*/
 
-    add_target(0.5,0.04,x,y,z);
+    add_target(0.21,0.03,x-0.041,y+0.015,z-0.012);
     //add_obstacle();
     ros::WallDuration(0.1).sleep();
 
@@ -540,11 +568,15 @@ bool PickPlace::define_pick(double x,double y,double z)
 
     ROS_INFO_STREAM("Grasping...");
     add_attached_obstacle();
-    gripper_three_action(0.75*FINGER_MAX);
+    gripper_three_action(0.7*FINGER_MAX);
 
     ROS_INFO_STREAM("Planning to post-grasp position");
     arm_group_->setPoseTarget(postgrasp_pose_);
     evaluate_plan(*arm_group_);
+
+    arm_group_->setNamedTarget("Home");
+    evaluate_plan(*arm_group_);
+
     if(position_replan_) return false; 
 
     /*
@@ -615,4 +647,151 @@ bool PickPlace::place(double x,double y,double z)
     result_=false;
     if(define_place()) return true;
     else return false;
+}
+
+
+bool PickPlace::tf_listen()
+{
+    tf::StampedTransform transform;
+    int data_num=0;
+    int cycle_num=0;
+    //double position[3];
+    double total_x=0.0;
+    double total_y=0.0;
+    double total_z=0.0;
+    ros::Rate rate(10.0);
+    for(int i=0;i<20;)
+    {
+       // try
+       // {
+          listener.lookupTransform("/base_link", "/object",ros::Time(0), transform);
+      //  }
+       /* catch (tf::TransformException ex){
+        //ROS_ERROR("%s",ex.what());
+        ROS_INFO("Can't receive the tf.");
+        ros::Duration(1.0).sleep();
+       }*/
+        tf_x[i]=transform.getOrigin().x();
+        tf_y[i]=transform.getOrigin().y();
+        tf_z[i]=transform.getOrigin().z();
+        if(i>0)
+        {
+          if((std::isnan(tf_x[i])==0 && std::isnan(tf_y[i])==0 && std::isnan(tf_z[i])==0)&&
+          (tf_x[i]!=0 || tf_y[i]!=0 || tf_z[i]!=0)&&(fabs(tf_x[i])<=0.8)&&
+          (fabs(tf_x[i]-tf_x[i-1])>1.0e-8 || fabs(tf_y[i]-tf_y[i-1])>1.0e-8 || fabs(tf_z[i]-tf_z[i-1])>1.0e-8))  
+            i++;
+        }
+        else
+        {
+          i++;
+        }  
+        cycle_num++;
+        if(cycle_num>=100) 
+        {
+            ROS_INFO("The cycle_num is :%d",cycle_num);
+            return false;
+        }
+        /*ROS_INFO("i is:%d",i);
+        std::cout<<"x is "<<tf_x[i]<<std::endl;
+        std::cout<<"y is "<<tf_y[i]<<std::endl;
+        std::cout<<"z is "<<tf_z[i]<<std::endl;*/
+        rate.sleep(); 
+    }
+
+    for(int i=0;i<20;i++)
+    {
+        int m=0;
+        for(int j=0;j<20;j++)
+        {
+            if(fabs(tf_z[i]-tf_z[j])<0.05) m++;
+        }
+        if(m>=15)
+        {
+            total_x+=tf_x[i];
+            total_y+=tf_y[i];
+            total_z+=tf_z[i];
+            data_num++;
+        }
+    }
+
+    ROS_INFO("The data num is:%d",data_num);
+    position[0]=total_x/data_num;
+    position[1]=total_y/data_num;
+    position[2]=total_z/data_num;
+
+    return true;    
+}
+
+bool PickPlace::random_position(double x,double y,double z)
+{
+  /*ROS_INFO("Current pose id is: %s",current_pose_.header.frame_id.c_str());
+  ROS_INFO("Current pose x is: %f",current_pose_.pose.position.x);
+  ROS_INFO("Current pose y is: %f",current_pose_.pose.position.y);
+  ROS_INFO("Current pose z is: %f",current_pose_.pose.position.z);*/
+
+  ROS_INFO("x is :%f",x);
+  ROS_INFO("y is :%f",y);
+  ROS_INFO("z is :%f",z);
+
+  double x_random=0.0;
+  double y_random=0.0;
+  double z_random=0.0;
+  double current_x=0.0955-current_pose_.pose.position.y;
+  double current_y=current_pose_.pose.position.x;
+  double current_z=current_pose_.pose.position.z+0.433;
+  ROS_INFO("Current x is: %f",current_x);
+  ROS_INFO("Current y is: %f",current_y);
+  ROS_INFO("Current z is: %f",current_z);
+
+  int k=rand()%50+1;
+  if(x>current_x)
+  {
+    x_random=current_x+k*(x-current_x)/100.0;
+  }
+  else
+  {
+    ROS_INFO("Generate random position failed.");
+    return false;
+  }
+
+  if(y>current_y)
+  {
+      y_random=current_y+k*(y-current_y)/100.0;
+  }
+  else
+  {
+      y_random=current_y-k*(current_y-y)/100.0;
+  }
+
+  if(z>current_z)
+  {
+      z_random=current_z+k*(z-current_z)/100.0;
+  }
+  else
+  {
+      z_random=current_z-k*(current_z-z)/100.0;
+  }
+
+  ROS_INFO("Random x is :%f",x_random);
+  ROS_INFO("Random y is :%f",y_random);
+  ROS_INFO("Random z is :%f",z_random);
+
+  tf::Quaternion q;
+  replan_pose_.header.frame_id="base_link";
+  replan_pose_.header.stamp=ros::Time::now();
+
+  replan_pose_.pose.position.x=x_random;
+  replan_pose_.pose.position.y=y_random;
+  replan_pose_.pose.position.z=z_random;
+
+  q=EulerZYZ_to_Quaternion(M_PI/4,M_PI/2,M_PI/2);
+  replan_pose_.pose.orientation.x=q.x();
+  replan_pose_.pose.orientation.y=q.y();
+  replan_pose_.pose.orientation.z=q.z();
+  replan_pose_.pose.orientation.w=q.w();
+
+  arm_group_->setPoseTarget(replan_pose_);
+  evaluate_plan(*arm_group_);
+  if(position_replan_) return false;
+  return true;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
 }

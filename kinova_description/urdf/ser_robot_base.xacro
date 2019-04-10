@@ -187,12 +187,13 @@
     		</collision>
   		</link>
   		<joint name="connect_joint" type="fixed">
-    		<origin xyz="0.096 0 0.369" rpy="-4.8209E-16 0 0" />
+    		<origin xyz="0.095 0 0.369" rpy="0 0 0" />
     		<parent link="base_link" />
     		<child link="connect_Link" />
     		<axis xyz="0 0 0" />
   		</joint>
-  		<link name="zed_Link">
+		<!-- ZEDcamera center -->
+  		<link name="zed_camera_center">
     		<inertial>
       			<origin xyz="0 0 0" rpy="0 0 0" />
       			<mass value="0.13706" />
@@ -201,7 +202,7 @@
     		<visual>
       			<origin xyz="0 0 0" rpy="0 0 0" />
       			<geometry>
-        			<mesh filename="package://ser_robot_description/meshes/zed_Link.STL" />
+        			<mesh filename="package://ser_robot_description/meshes/ZED.stl" />
       			</geometry>
       			<material name="zed_mate">
         			<color rgba="1 1 1 1" />
@@ -210,14 +211,81 @@
     		<collision>
       			<origin xyz="0 0 0" rpy="0 0 0" />
       			<geometry>
-        			<mesh filename="package://ser_robot_description/meshes/zed_Link.STL" />
+        			<mesh filename="package://ser_robot_description/meshes/ZED.stl" />
      	 		</geometry>
     		</collision>
   		</link>
-  		<joint name="zed_joint" type="fixed">
-    		<origin xyz="0.245 0 0.5025" rpy="1.5708 0 1.5708" />
+  		<!--joint name="zed_joint" type="fixed">
+    		<origin xyz="0.245 0 0.6665" rpy="0 0 0" />
     		<parent link="base_link" />
-    		<child link="zed_Link" />
+    		<child link="zed_camera_center" />
+    		<axis xyz="0 0 0" />
+  		</joint-->
+      <joint name="zed_joint" type="fixed">
+    		<origin xyz="0.245 0 0.6665" rpy="0 0 0" />
+    		<parent link="base_link" />
+    		<child link="zed_camera_center" />
+    		<axis xyz="0 0 0" />
+  		</joint>
+		<!-- Left Camera -->
+		<joint name="zed_left_camera_joint" type="fixed">
+        	<parent link="zed_camera_center"/>
+        	<child link="zed_left_camera_frame"/>
+        	<origin xyz="0 0.06 0" rpy="0 0 0" />
+    	</joint>
+
+    	<link name="zed_left_camera_frame" />
+
+    	<joint name="zed_left_camera_optical_joint" type="fixed">
+        	<origin xyz="0 0 0" rpy="-1.57079632679 0.0 -1.57079632679"/>
+        	<parent link="zed_left_camera_frame"/>
+        	<child link="zed_left_camera_optical_frame"/>
+    	</joint>
+
+    	<link name="zed_left_camera_optical_frame"/>
+		<!-- Right Camera -->
+		<joint name="zed_right_camera_joint" type="fixed">
+        	<parent link="zed_camera_center"/>
+        	<child link="zed_right_camera_frame"/>
+        	<origin xyz="0 -0.06 0" rpy="0 0 0" />
+    	</joint>
+
+    	<link name="zed_right_camera_frame" />
+
+    	<joint name="zed_right_camera_optical_joint" type="fixed">
+        	<origin xyz="0 0 0" rpy="-1.57079632679 0.0 -1.57079632679"/>
+        	<parent link="zed_right_camera_frame"/>
+        	<child link="zed_right_camera_optical_frame"/>
+    	</joint>
+
+    	<link name="zed_right_camera_optical_frame"/>
+
+		<link name="securityroom_Link">
+    		<inertial>
+      			<origin xyz="0.03 0 0.252" rpy="0 0 0" />
+      			<mass value="1.9872" />
+      			<inertia ixx="0.0766937554434782" ixy="0" ixz="0" iyy="0.0337313554434782" iyz="0" izz="0.04415472" />
+    		</inertial>
+    		<visual>
+      			<origin xyz="0 0 0" rpy="0 0 0" />
+      			<geometry>
+        			<mesh filename="package://ser_robot_description/meshes/securityroom_Link.STL" />
+      			</geometry>
+      			<material name="security_mat">
+        			<color rgba="1 1 1 0.3" />
+      			</material>
+   			</visual>
+    		<collision>
+      			<origin xyz="0 0 0" rpy="0 0 0" />
+      			<geometry>
+        			<mesh filename="package://ser_robot_description/meshes/securityroom_Link.STL" />
+      			</geometry>
+    		</collision>
+  		</link>
+  		<joint name="securityroom_joint" type="fixed">
+    		<origin xyz="0.23 0 0.312" rpy="0 0 0" />
+    		<parent link="base_link" />
+    		<child link="securityroom_Link" />
     		<axis xyz="0 0 0" />
   		</joint>
 	</xacro:macro>
